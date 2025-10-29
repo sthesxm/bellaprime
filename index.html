@@ -254,7 +254,7 @@
       <span class="live-dot"></span> <strong>+7.500 membros</strong> · <strong>🎯 1 clique</strong> · <strong>🚫 Sem spam</strong>
     </div>
 
-    <!-- CTA principal (mesmo id/class). Mantive o spinner para o estado "loading". -->
+    <!-- CTA principal -->
     <button id="ctaMain" class="cta-btn attn-halo">
       <span class="cta-icon left" aria-hidden="true">
         <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
@@ -273,7 +273,7 @@
       <span class="spinner" aria-hidden="true"></span>
     </button>
 
-    <!-- Linha de confiança (abaixo do CTA) -->
+    <!-- Linha de confiança -->
     <p class="trust-line">
       🔒 100% seguro · Link oficial do grupo · Nenhum dado é solicitado
     </p>
@@ -440,25 +440,8 @@
       function openWhatsAppSmart(){
         // dispara Lead apenas 1x
         trackLeadOnce();
-
-        const ua = navigator.userAgent || '';
-        const isAndroid = /Android/i.test(ua);
-        const isIOS     = /iPhone|iPad|iPod/i.test(ua);
-
-        if (isAndroid) {
-          // tracking pelo seu link -> fallback Intent
-          window.location.href = WHATS_LINK;
-          setTimeout(()=>{ window.location.href = 'intent://send/#Intent;scheme=whatsapp;package=com.whatsapp;end'; }, 200);
-        } else if (isIOS) {
-          // deep-link app -> fallback link normal
-          window.location.href = 'whatsapp://';
-          setTimeout(()=>{ window.location.href = WHATS_LINK; }, 200);
-        } else {
-          // Desktop: tracking + tentativa de abrir o WhatsApp Web
-          window.location.href = WHATS_LINK;
-          setTimeout(()=>{ window.location.href = 'https://web.whatsapp.com/'; }, 300);
-        }
-        // nada de window.open — evita abas/eventos duplicados
+        // **ABRE SEMPRE VIA SENDFLOW PARA GARANTIR RASTREIO**
+        window.location.assign(WHATS_LINK);
       }
 
       function handleClick(e){
@@ -497,4 +480,5 @@
   </script>
 </body>
 </html>
+
 
