@@ -42,8 +42,8 @@
 
     function cryptoRandomId(){
       var a = (self.crypto||{}).getRandomValues ? crypto.getRandomValues(new Uint8Array(16)) : Array.from({length:16},()=>Math.random()*256|0);
-      a[6] = (a[6] & 0x0f) | 0x40;
-      a[8] = (a[8] & 0x3f) | 0x80;
+      a[6] = (a[6] & 0x0f) | 0x40; // v4
+      a[8] = (a[8] & 0x3f) | 0x80; // variant
       var h = Array.from(a, b=>('0'+b.toString(16)).slice(-2)).join('');
       return h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20);
     }
@@ -65,15 +65,19 @@
       --shadow:0 10px 25px rgba(0,0,0,.1);
       --radius:18px;
     }
+
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:#fff;color:#222;padding-bottom:80px}
+
     header{
       background: linear-gradient(135deg, var(--grad-start) 0%, var(--grad-end) 100%);
       padding:18px 18px 22px;text-align:center;border-radius:0 0 24px 24px;color:var(--white);
       box-shadow:var(--shadow);animation:hdrIn .6s ease both;
     }
     @keyframes hdrIn{from{opacity:0; transform:translateY(-8px)} to{opacity:1; transform:translateY(0)}}
-    .logo-wrap{width:120px;height:120px;margin:0 auto 10px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px rgba(0,0,0,.2);overflow:hidden;}
+    .logo-wrap{
+      width:120px;height:120px;margin:0 auto 10px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px rgba(0,0,0,.2);overflow:hidden;
+    }
     .logo-wrap img{width:100%;height:100%;object-fit:cover;object-position:center;border-radius:50%}
     h1{font-size:28px;font-weight:800;margin-bottom:4px;color:var(--text-main)}
     .subtitle{font-size:14px;color:#f1f1f1;margin-bottom:10px}
@@ -154,7 +158,7 @@
     }
 
     function boot(){
-      // 🔗 alteração feita aqui:
+      // ✅ ALTERAÇÃO AQUI: novo link para os dois botões
       const WHATS_LINK="https://sndflw.com/i/bellaprimepromos";
 
       const START_VACANCIES=24, MIN_VACANCIES=2;
@@ -171,8 +175,97 @@
         "Lorena Ribeiro","Graça Monteiro","Helena Antunes","Patrícia Rocha","Juliana Costa","Madalena Correia",
         "Adélia Vieira","Celina Pinto","Renata Tavares","Gabriela Melo","Sônia Gonçalves","Daniela Farias"
       ];
+      function shuffle(arr){for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}return arr;}
+      let namesQueue=shuffle([...NAMES_POOL]);
 
-      // ... resto do script permanece igual ...
+      let currentVacancies = parseInt(localStorage.getItem("currentVacancies")) || START_VACANCIES;
+      function normalizeDateStr(d){return new Date(d.getFullYear(), d.getMonth(), d.getDate()).toDateString();}
+      const todayStr = normalizeDateStr(new Date());
+      const lastResetDate = localStorage.getItem("lastResetDate");
+      if (lastResetDate !== todayStr) { resetVacancies(); }
+      scheduleMidnightReset();
+
+      function resetVacancies(){
+        currentVacancies = START_VACANCIES;
+        localStorage.setItem("currentVacancies", currentVacancies);
+        localStorage.setItem("lastResetDate", normalizeDateStr(new Date()));
+        updateVacancyUI();
+      }
+      function scheduleMidnightReset(){
+        const now = new Date();
+        const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0);
+        const msToMidnight = nextMidnight.getTime() - now.getTime();
+        setTimeout(() => {
+          resetVacancies();
+          setInterval(resetVacancies, 24*60*60*1000);
+        }, msToMidnight);
+      }
+      function updateVacancyUI(){
+        if (!vacancyText || !fillBar) return;
+        const prev = vacancyText.textContent;
+        vacancyText.textContent=`Últimas vagas de hoje • Restam ${currentVacancies} 👇`;
+        if(prev !== vacancyText.textContent){
+          vacancyText.style.transition = 'transform .12s ease';
+          vacancyText.style.transform = 'scale(1.08)';
+          setTimeout(()=>vacancyText.style.transform='scale(1)', 120);
+        }
+        const filled=(START_VACANCIES-currentVacancies)/(START_VACANCIES-MIN_VACANCIES);
+        const pct=Math.max(0,Math.min(1,filled));
+        fillBar.style.inset=`0 ${(1-pct)*100}% 0 0`;
+      }
+      function step(){
+        if(currentVacancies<=MIN_VACANCIES) return;
+        if(namesQueue.length===0) namesQueue=shuffle([...NAMES_POOL]);
+        const name=namesQueue.shift();
+        pushNotification(name);
+        currentVacancies--;
+        localStorage.setItem("currentVacancies", currentVacancies);
+        updateVacancyUI();
+        if(currentVacancies>MIN_VACANCIES){
+          const nextMs=[1000,2000,3000][Math.floor(Math.random()*3)];
+          setTimeout(step,nextMs);
+        }
+      }
+      function pushNotification(name){
+        if(!feedEl) return;
+        const row=document.createElement('div');
+        row.className='notif';
+        row.innerHTML=`<div class="badge">✅</div><div><strong>${name}</strong> entrou no grupo</div>`;
+        if(feedEl.firstChild){ feedEl.insertBefore(row,feedEl.firstChild); }
+        else{ feedEl.appendChild(row); }
+        if(feedEl.children.length>3){ feedEl.removeChild(feedEl.lastChild); }
+      }
+
+      const io = new IntersectionObserver((entries)=>{
+        entries.forEach(e=>{
+          if(e.isIntersecting){
+            e.target.style.transition='transform .4s ease, opacity .4s ease';
+            e.target.style.transform='translateY(0)';
+            e.target.style.opacity='1';
+            io.unobserve(e.target);
+          }
+        });
+      },{threshold:0.12});
+      document.querySelectorAll('.benefit').forEach(b=> io.observe(b));
+
+      const LEAD_LOCK_KEY = 'lead_lock_until';
+      let leadFiredFlag = false;
+      function canFireLead(){
+        const now = Date.now();
+        const lockUntil = parseInt(sessionStorage.getItem(LEAD_LOCK_KEY) || '0', 10);
+        return (!leadFiredFlag) && (now > lockUntil);
+      }
+      function setLeadLock(ms=30000){
+        sessionStorage.setItem(LEAD_LOCK_KEY, String(Date.now() + ms));
+      }
+      function trackLeadOnce(){
+        if (!canFireLead()) return null;
+        leadFiredFlag = true;
+        setLeadLock(30000);
+        const eventId = 'lead-' + uuidv4();
+        try { fbq('track','Lead',{ event_id: eventId }); } catch(e){}
+        return eventId;
+      }
 
       function openWhatsAppSmart(){
         trackLeadOnce();
@@ -193,10 +286,30 @@
         }
       }
 
+      function handleClick(e){
+        const btn = e.currentTarget;
+        if (btn.dataset.clicked === '1') return;
+        btn.dataset.clicked = '1';
+
+        btn.classList.add('loading');
+        btn.setAttribute('disabled','true');
+
+        openWhatsAppSmart();
+
+        setTimeout(()=>{
+          btn.classList.remove('loading');
+          btn.removeAttribute('disabled');
+          btn.dataset.clicked = '0';
+        }, 4000);
+      }
+
       const btnMain  = document.getElementById('ctaMain');
       const btnFoot  = document.getElementById('ctaFooter');
       if (btnMain) btnMain.addEventListener('click', handleClick);
       if (btnFoot) btnFoot.addEventListener('click', handleClick);
+
+      updateVacancyUI();
+      if(currentVacancies>MIN_VACANCIES){ setTimeout(step,1000); }
     }
 
     if (document.readyState === 'loading') {
