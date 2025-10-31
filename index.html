@@ -38,22 +38,22 @@
       if (sessionStorage.getItem(PV_KEY)) return;
       sessionStorage.setItem(PV_KEY, '1');
       var eid = 'pv-' + cryptoRandomId();
-      try { fbq('track','PageView',{ event_id: eid }); } catch(e){}
-      console.debug('[Pixel] PageView enviado (', eid, ')');
+      try {
+        // ✅ eventID vai no 4º argumento (options)
+        fbq('track','PageView', {}, { eventID: eid });
+        console.debug('[Pixel] PageView enviado (eventID=%s)', eid);
+      } catch(e){}
     }
 
-    // Evita bfcache; garante disparo pós-carregamento
     function arm(){
       if (typeof fbq === 'function') firePV();
     }
 
-    // Se o navegador suportar pageshow (melhor para bfcache)
     window.addEventListener('pageshow', function(evt){
-      if (evt.persisted) return; // restaurado do bfcache -> não dispara
+      if (evt.persisted) return; // bfcache
       arm();
     }, { once:true });
 
-    // Fallback adicional
     if (document.readyState === 'complete' || document.readyState === 'interactive') {
       setTimeout(arm, 0);
     } else {
@@ -449,7 +449,11 @@
         leadFiredFlag = true;
         setLeadLock(30000);
         const eventId = 'lead-' + uuidv4();
-        try { fbq('track','Lead',{ event_id: eventId }); } catch(e){}
+        try {
+          // ✅ eventID vai no 4º argumento (options)
+          fbq('track','Lead', {}, { eventID: eventId });
+          console.debug('[Pixel] Lead enviado (eventID=%s)', eventId);
+        } catch(e){}
         return eventId;
       }
 
@@ -496,6 +500,7 @@
   </script>
 </body>
 </html>
+
 
 
 
