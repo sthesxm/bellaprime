@@ -22,23 +22,9 @@
   fbq('init', '3339863286151913');
   fbq('set', 'autoConfig', false, '3339863286151913');
 
+  /* PageView 1x por sessão/rota, com fallbacks seguros */
   (function sendPageViewOnce(){
-    var nav = performance.getEntriesByType && performance.getEntriesByType('navigation')[0];
-    var isBFCache = nav && nav.type === 'back_forward';
     var PV_KEY = 'pv_sent:' + location.pathname + ':' + (new Date()).toDateString();
-
-    function firePV(){
-      if (sessionStorage.getItem(PV_KEY)) return;
-      sessionStorage.setItem(PV_KEY, '1');
-      try { fbq('track','PageView',{ event_id: 'pv-' + cryptoRandomId() }); } catch(e){}
-    }
-    if (document.prerendering) {
-      document.addEventListener('prerenderingchange', function(){
-        if (!isBFCache) firePV();
-      }, { once:true });
-    } else {
-      if (!isBFCache) firePV();
-    }
 
     function cryptoRandomId(){
       var a = (self.crypto||{}).getRandomValues ? crypto.getRandomValues(new Uint8Array(16)) : Array.from({length:16},()=>Math.random()*256|0);
@@ -47,8 +33,38 @@
       var h = Array.from(a, b=>('0'+b.toString(16)).slice(-2)).join('');
       return h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20);
     }
+
+    function firePV(){
+      if (sessionStorage.getItem(PV_KEY)) return;
+      sessionStorage.setItem(PV_KEY, '1');
+      var eid = 'pv-' + cryptoRandomId();
+      try { fbq('track','PageView',{ event_id: eid }); } catch(e){}
+      console.debug('[Pixel] PageView enviado (', eid, ')');
+    }
+
+    // Evita bfcache; garante disparo pós-carregamento
+    function arm(){
+      if (typeof fbq === 'function') firePV();
+    }
+
+    // Se o navegador suportar pageshow (melhor para bfcache)
+    window.addEventListener('pageshow', function(evt){
+      if (evt.persisted) return; // restaurado do bfcache -> não dispara
+      arm();
+    }, { once:true });
+
+    // Fallback adicional
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+      setTimeout(arm, 0);
+    } else {
+      document.addEventListener('DOMContentLoaded', arm, { once:true });
+    }
   })();
   </script>
+  <noscript>
+    <img height="1" width="1" style="display:none"
+         src="https://www.facebook.com/tr?id=3339863286151913&ev=PageView&noscript=1"/>
+  </noscript>
   <!-- End Meta Pixel -->
 
   <style>
@@ -480,6 +496,8 @@
   </script>
 </body>
 </html>
+
+
 
 
 
