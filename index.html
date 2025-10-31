@@ -7,7 +7,7 @@
   <title>Bella Prime Achados 🏡💗 | Entrar no Grupo</title>
   <link rel="preconnect" href="https://sndflw.com" crossorigin>
 
-  <!-- Meta Pixel (dedupe PageView 1x por sessão) -->
+  <!-- Meta Pixel (PageView 1x + detector + fallback) -->
   <script>
   !function(f,b,e,v,n,t,s){
     if(f.fbq) return;
@@ -19,35 +19,70 @@
     s=b.getElementsByTagName(e)[0]; s.parentNode.insertBefore(t,s);
   }(window, document,'script','https://connect.facebook.net/en_US/fbevents.js');
 
-  fbq('init', ' 3980287168887071');
-  fbq('set', 'autoConfig', false, ' 3980287168887071');
+  fbq('init', '3339863286151913');
+  fbq('set', 'autoConfig', false, '3339863286151913');
 
-  /* PageView 1x por sessão/rota, com fallbacks seguros */
+  // === Util: vigia "facebook.com/tr" e sabe se EV saiu ===
+  (function setupTrWatcher(){
+    var seen = {}; // ex: seen.PageView = true
+    function markSeen(url){
+      try{
+        if(url.indexOf('facebook.com/tr')===-1) return;
+        var params = new URL(url).searchParams;
+        if (params.get('id') !== '3339863286151913') return;
+        var ev = params.get('ev');
+        if (ev) seen[ev] = true;
+      }catch(_){}
+    }
+    // PerformanceObserver (pega recursos já carregados e futuros)
+    try{
+      var po = new PerformanceObserver(function(list){
+        list.getEntries().forEach(function(e){ if(e && e.name) markSeen(e.name); });
+      });
+      po.observe({ type:'resource', buffered:true });
+      // Varredura inicial para o caso de já ter disparado
+      performance.getEntriesByType('resource').forEach(function(e){ if(e && e.name) markSeen(e.name); });
+    }catch(_){}
+    // Exponho leitura simples:
+    window.__pixelSeen = function(ev){ return !!seen[ev]; };
+  })();
+
+  // === PageView 1x por sessão/rota com fallback img-beacon ===
   (function sendPageViewOnce(){
     var PV_KEY = 'pv_sent:' + location.pathname + ':' + (new Date()).toDateString();
 
     function cryptoRandomId(){
       var a = (self.crypto||{}).getRandomValues ? crypto.getRandomValues(new Uint8Array(16)) : Array.from({length:16},()=>Math.random()*256|0);
-      a[6] = (a[6] & 0x0f) | 0x40; // v4
-      a[8] = (a[8] & 0x3f) | 0x80; // variant
+      a[6] = (a[6] & 0x0f) | 0x40; a[8] = (a[8] & 0x3f) | 0x80;
       var h = Array.from(a, b=>('0'+b.toString(16)).slice(-2)).join('');
       return h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20);
+    }
+
+    function beaconBackup(ev){
+      // Só usa se não viu o request normal
+      if (window.__pixelSeen && window.__pixelSeen(ev)) return;
+      var i = new Image(1,1);
+      var u = 'https://www.facebook.com/tr'
+            + '?id=3339863286151913'
+            + '&ev=' + encodeURIComponent(ev)
+            + '&dl=' + encodeURIComponent(location.href)
+            + '&rl=' + encodeURIComponent(document.referrer || '')
+            + '&if=false'
+            + '&r=' + Math.random();
+      i.src = u;
+      // console.debug('[Pixel] Fallback IMG ->', ev);
     }
 
     function firePV(){
       if (sessionStorage.getItem(PV_KEY)) return;
       sessionStorage.setItem(PV_KEY, '1');
       var eid = 'pv-' + cryptoRandomId();
-      try {
-        // ✅ eventID vai no 4º argumento (options)
-        fbq('track','PageView', {}, { eventID: eid });
-        console.debug('[Pixel] PageView enviado (eventID=%s)', eid);
-      } catch(e){}
+      try { fbq('track','PageView', {}, { eventID: eid }); } catch(e){}
+      // dá 1500ms pro request aparecer; se não, dispara backup
+      setTimeout(function(){ beaconBackup('PageView'); }, 1500);
     }
 
-    function arm(){
-      if (typeof fbq === 'function') firePV();
-    }
+    function arm(){ if (typeof fbq === 'function') firePV(); }
 
     window.addEventListener('pageshow', function(evt){
       if (evt.persisted) return; // bfcache
@@ -395,7 +430,7 @@
         }
         const filled=(START_VACANCIES-currentVacancies)/(START_VACANCIES-MIN_VACANCIES);
         const pct=Math.max(0,Math.min(1,filled));
-        fillBar.style.inset=`0 ${(1-pct)*100}% 0 0`;
+        fillBar.style.inset=`0 ${(1-pct)*100)% 0 0`.replace('%','%'); // keep as is
       }
       function step(){
         if(currentVacancies<=MIN_VACANCIES) return;
@@ -433,7 +468,7 @@
       },{threshold:0.12});
       document.querySelectorAll('.benefit').forEach(b=> io.observe(b));
 
-      /* ===== CLICK → LEAD (ANTI-DUP) ===== */
+      /* ===== CLICK → LEAD (ANTI-DUP + fallback IMG) ===== */
       const LEAD_LOCK_KEY = 'lead_lock_until';
       let leadFiredFlag = false;
       function canFireLead(){
@@ -449,26 +484,27 @@
         leadFiredFlag = true;
         setLeadLock(30000);
         const eventId = 'lead-' + uuidv4();
-        try {
-          // ✅ eventID vai no 4º argumento (options)
-          fbq('track','Lead', {}, { eventID: eventId });
-          console.debug('[Pixel] Lead enviado (eventID=%s)', eventId);
-        } catch(e){}
+        try { fbq('track','Lead', {}, { eventID: eventId }); } catch(e){}
+        // fallback se não saiu request normal
+        setTimeout(function(){
+          if (window.__pixelSeen && !window.__pixelSeen('Lead')) {
+            var i = new Image(1,1);
+            i.src = 'https://www.facebook.com/tr?id=3339863286151913&ev=Lead&dl='
+                  + encodeURIComponent(location.href) + '&if=false&r=' + Math.random();
+          }
+        }, 1500);
         return eventId;
       }
 
       function openWhatsAppSmart(){
-        // dispara Lead apenas 1x
-        trackLeadOnce();
-        // **ABRE SEMPRE VIA SENDFLOW PARA GARANTIR RASTREIO**
-        window.location.assign(WHATS_LINK);
+        trackLeadOnce();                 // dispara Lead 1x
+        window.location.assign(WHATS_LINK); // abre Sendflow
       }
 
       function handleClick(e){
         const btn = e.currentTarget;
         if (btn.dataset.clicked === '1') return; // anti duplo clique real
         btn.dataset.clicked = '1';
-
         btn.classList.add('loading');
         btn.setAttribute('disabled','true');
 
@@ -491,7 +527,6 @@
       if(currentVacancies>MIN_VACANCIES){ setTimeout(step,1000); }
     }
 
-    // Garante DOM pronto antes de iniciar
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', boot, { once:true });
     } else {
@@ -500,6 +535,7 @@
   </script>
 </body>
 </html>
+
 
 
 
